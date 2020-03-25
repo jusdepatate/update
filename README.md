@@ -5,7 +5,7 @@ This tiny CLI tools will `git pull` & recompile software automatically.
 This tool is not perfect, feel free to open issues and Pull Requests
 
 ## Configuration
-Edit `$BUILDFOLDER` and `$CPU_CORES` with your needs, by default they are respectivly set at `$HOME/buid` and `$(nproc)`
+Edit `$BUILDFOLDER` and `$CPU_CORES` with your needs, by default they are respectivly set at `$HOME/build` and `$(nproc)`
 
 In `$BUILDFOLDER` you can create a file named with the software you want to install + `-compilation` containing commands to execute to compile the software.
 <br>Examples:
