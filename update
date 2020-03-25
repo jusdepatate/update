@@ -10,7 +10,7 @@ CPU_CORES="$(nproc)"
 # you can use $(( $(nproc) / 2)) to use half your CPU cores for example, I use $(nproc) for faster compilation
 
 fatal() {
-	echo -e "$*"
+	printf "%s\n" "$*"
 	exit 1
 }
 
