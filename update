@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+# Jus de Patate - 2020
+# shellcheck disable=SC2164
+# This tool update and compile things
+
+BUILDFOLDER="$HOME/build"
+# Make sure your user can write in this folder
+
+CPU_CORES="$(nproc)"
+# you can use $(( $(nproc) / 2)) to use half your CPU cores for example, I use $(nproc) for faster compilation
+
+fatal() {
+	echo -e "$*"
+	exit 1
+}
+
+version="1.0"
+
+if [ ! -d "$BUILDFOLDER" ]; then
+  fatal "$BUILDFOLDER/ doesn't exist,\nWas it deleted ? Have you changed the default values in $0 ?"
+elif [ ! -w "$BUILDFOLDER" ]; then
+  fatal "I can't write in $BUILDFOLDER, change permissions for $(whoami)"
+fi
+# check that folder exists and is writeable
+
+update() {
+	if [ -z "$1" ]; then
+		fatal "update(): Missing argument in function call (this shouldn't happen)"
+	fi
+
+	TARGETFOLDER="$BUILDFOLDER/$1"
+
+	if [ ! -d "$TARGETFOLDER" ]; then
+    fatal "$1/ doesn't exist in $BUILDFOLDER, cannot update."
+  elif [ ! -w "$TARGETFOLDER" ]; then
+    fatal "I can't write in $TARGETFOLDER, change permissions for $(whoami)"
+  fi
+
+	cd "$BUILDFOLDER/$1"
+	
+	LOCAL="$(git rev-parse HEAD)"
+	REMOTE="$(git ls-remote origin | grep "refs/heads/master" | cut -f1 | head -n1)"
+	# fetch latest local and remote commit so we don't recompile/repull with no changes
+	
+	if [ "$LOCAL" = "$REMOTE" ] && [ -f "$BUILDFOLDER/$1-lastcompilation" ] || [ -z "$FORCE" ]; then
+		echo "No need to recompile"
+	else
+		git pull
+		git submodule update --init --recursive
+		if [ -f "$BUILDFOLDER/$1-compilation" ]; then
+			sh "$BUILDFOLDER/$1-compilation" || fatal "something went wrong with commands in $BUILDFOLDER/$1-compilation"
+		else
+			echo "No compilation command file ($BUILDFOLDER/$1-compilation), trying to guess"
+			if [ -f "autogen.sh" ]; then
+				sh autogen.sh
+			fi
+			if [ -f "configure" ]; then
+				sh configure
+			fi
+			# shellcheck disable=SC2086
+			make -j${CPU_CORES} || fatal "sudo make install failed"
+			sudo make install || fatal "sudo make install failed"
+		fi
+		date > "$BUILDFOLDER/$1-lastcompilation"
+	fi
+	cd - > /dev/null
+	return 0
+}
+
+# force argument detection
+if [ "$1" = "-f" ] || [ "$1" = "--force" ]; then
+  FORCE=1
+  shift
+  # moves $2 to $3, $3 to $2, ...
+elif [ "$2" = "-f" ] || [ "$2" = "--force" ]; then
+  FORCE=1
+  # no need to shift as it's the second argument
+fi
+
+if [ "$1" = "all" ]; then
+	cd $BUILDFOLDER
+
+	REPOS="$(find . -maxdepth 1 -type d)"
+	for D in $REPOS; do
+	  D=${D/.\//}
+		if [ ! "$D" = "." ]; then
+			echo "Updating $D"
+			update "$D"
+		fi
+	done
+	cd -- > /dev/null
+elif [ -z "$1" ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+	echo "update:"
+	echo "Jus de Patate - 2020 - $version"
+	echo ""
+	echo "BUILDFOLDER=$BUILDFOLDER (readable and writeable by $(whoami)"
+	echo "CPU_CORES=$CPU_CORES (used only when guessing what to do)"
+	echo ""
+	echo "Accepted arguments:"
+	echo "-h | --help - show this"
+	echo "-f | --force - force recompilation"
+else
+  for arg in "$@"; do
+	  update "$arg"
+	done
+fi
